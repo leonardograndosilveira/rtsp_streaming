@@ -120,7 +120,7 @@ class RTSPServer:
 
 def main():
     parser = argparse.ArgumentParser(description="RTSP Streamer CLI")
-    parser.add_argument("--source", required=True, help="Path to the video file source")
+    parser.add_argument("--source", required=True, help="Path to the video file source", default="/home/allcance/projects/roi_text_extraction/sample_test.mp4")
     args = parser.parse_args()
 
     if not os.path.exists(args.source):
