@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPS_CENTER // SURVEILLANCE_HUB</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="ops-container">
+        <!-- HEADER -->
+        <header>
+            <div class="brand">
+                <span>ALLVISION</span>
+                <span style="color: var(--neon-green); font-size: 0.8em;">// V.2.0</span>
+            </div>
+            <div class="system-status">
+                <span>CPU: <span id="cpu-load">12%</span></span>
+                <span>MEM: <span id="mem-load">4.2GB</span></span>
+                <span>NET: <span style="color: var(--neon-amber);">STABLE</span></span>
+                <span id="clock">00:00:00</span>
+            </div>
+        </header>
+
+        <!-- SIDEBAR CONTROLS -->
+        <aside>
+            <div class="control-group">
+                <div class="control-label">Source Select</div>
+                <select id="source-type">
+                    <option value="camera">LIVE FEED (CAMERA)</option>
+                    <option value="file">ARCHIVE (FILE)</option>
+                </select>
+            </div>
+
+            <div id="camera-controls" class="control-group">
+                <div class="control-label">Camera Index</div>
+                <select id="camera-select">
+                    <option value="" disabled selected>SCANNING...</option>
+                </select>
+                <button id="refresh-cameras" class="btn">REFRESH DEVICES</button>
+            </div>
+
+            <div id="file-controls" class="control-group hidden">
+                <div class="control-label">File Upload</div>
+                <div class="file-upload-wrapper">
+                    <input type="file" id="file-input" accept="video/*">
+                </div>
+                <button id="upload-btn" class="btn">UPLOAD ARCHIVE</button>
+                <div class="control-label" style="margin-top: 10px;">Select File</div>
+                <select id="file-select">
+                    <option value="" disabled selected>NO MEDIA</option>
+                </select>
+            </div>
+
+            <div class="control-group" style="margin-top: auto;">
+                <div class="control-label">Stream Control</div>
+                <button id="start-btn" class="btn btn-primary">INITIATE STREAM</button>
+                <button id="stop-btn" class="btn btn-danger btn-disabled">TERMINATE</button>
+                <button id="probe-btn" class="btn btn-secondary hidden" style="margin-top: 10px;">HEALTH CHECK</button>
+            </div>
+        </aside>
+
+        <!-- MAIN VIEWPORT -->
+        <main id="viewport">
+            <div class="scan-line-anim"></div>
+            <!-- The video player or image would go here. For now, placeholders/status. -->
+            <div id="video-placeholder" class="video-feed-placeholder">
+                <div style="font-size: 64px; color: var(--panel-border); margin-bottom: 20px;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9Z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 2v2"/>
+                        <path d="M12 20v2"/>
+                        <path d="M2 12h2"/>
+                        <path d="M20 12h2"/>
+                    </svg>
+                </div>
+                <h2 style="color: var(--text-dim); letter-spacing: 2px;">WAITING FOR SIGNAL</h2>
+                <div style="font-size: 12px; color: var(--panel-border);">[RTSP DISCONNECTED]</div>
+            </div>
+            
+            <!-- Hidden by default, shown when streaming -->
+            <div id="stream-container" class="hidden" style="width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; position: relative;">
+                 <h2 id="stream-status-msg" style="color: var(--neon-green); animation: blink 1s infinite;">STREAM ACTIVE</h2>
+                 
+                 <div id="hud-overlay" class="hidden" style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); border: 1px solid var(--panel-border); padding: 10px; font-family: monospace; font-size: 12px; color: var(--neon-amber); text-align: left; pointer-events: none; z-index: 10;">
+                    <div style="border-bottom: 1px solid var(--panel-border); margin-bottom: 5px; padding-bottom: 2px; font-weight: bold;">STREAM_STATS</div>
+                    <div>RES: <span id="hud-res">N/A</span></div>
+                    <div>CDC: <span id="hud-codec">N/A</span></div>
+                    <div>BTR: <span id="hud-bitrate">N/A</span></div>
+                    <div id="hud-sim-tag" class="hidden" style="font-size: 10px; color: var(--text-dim); margin-top: 5px;">[SIMULATED_DATA]</div>
+                 </div>
+                 
+            </div>
+        </main>
+
+        <!-- FOOTER / STATUS -->
+        <footer>
+            <div style="display: flex; align-items: center;">
+                <span id="status-dot" class="status-indicator standby"></span>
+                <span id="status-text" class="console-log">SYSTEM STANDBY</span>
+            </div>
+            <div class="console-log" id="rtsp-url-display">RTSP://N/A</div>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
