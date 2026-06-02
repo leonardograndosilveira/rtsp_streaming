@@ -16,6 +16,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('refresh-cameras').addEventListener('click', loadCameras);
     document.getElementById('upload-btn').addEventListener('click', uploadFile);
+    document.getElementById('connect-network-btn').addEventListener('click', () => {
+        const btn = document.getElementById('connect-network-btn');
+        const url = document.getElementById('network-url').value;
+        if (url && url.startsWith('rtsp://')) {
+            const originalText = btn.innerText;
+            btn.innerText = "LINK ESTABLISHED";
+            btn.classList.add('btn-primary');
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.classList.remove('btn-primary');
+            }, 2000);
+        } else {
+            alert("INVALID NETWORK TARGET");
+        }
+    });
     document.getElementById('start-btn').addEventListener('click', startStream);
     document.getElementById('stop-btn').addEventListener('click', stopStream);
     document.getElementById('probe-btn').addEventListener('click', probeStream);
@@ -42,13 +57,18 @@ function switchMode(mode) {
     currentMode = mode;
     const secCamera = document.getElementById('camera-controls');
     const secFile = document.getElementById('file-controls');
+    const secNetwork = document.getElementById('network-controls');
+
+    secCamera.classList.add('hidden');
+    secFile.classList.add('hidden');
+    secNetwork.classList.add('hidden');
 
     if (mode === 'camera') {
         secCamera.classList.remove('hidden');
-        secFile.classList.add('hidden');
-    } else {
+    } else if (mode === 'file') {
         secFile.classList.remove('hidden');
-        secCamera.classList.add('hidden');
+    } else if (mode === 'network') {
+        secNetwork.classList.remove('hidden');
     }
 }
 
@@ -149,9 +169,12 @@ async function startStream() {
     if (type === 'camera') {
         path = document.getElementById('camera-select').value;
         if (!path || path.includes("NO DEVICES")) return alert("INVALID CAMERA FEED");
-    } else {
+    } else if (type === 'file') {
         path = document.getElementById('file-select').value;
          if (!path || path.includes("ARCHIVE EMPTY")) return alert("INVALID FILE SOURCE");
+    } else if (type === 'network') {
+        path = document.getElementById('network-url').value;
+        if (!path || !path.startsWith('rtsp://')) return alert("INVALID NETWORK TARGET");
     }
 
     const btnStart = document.getElementById('start-btn');

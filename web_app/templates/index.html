@@ -29,6 +29,7 @@
                 <select id="source-type">
                     <option value="camera">LIVE FEED (CAMERA)</option>
                     <option value="file">ARCHIVE (FILE)</option>
+                    <option value="network">EXTERNAL (NETWORK)</option>
                 </select>
             </div>
 
@@ -50,6 +51,12 @@
                 <select id="file-select">
                     <option value="" disabled selected>NO MEDIA</option>
                 </select>
+            </div>
+
+            <div id="network-controls" class="control-group hidden">
+                <div class="control-label">Network Connection</div>
+                <input type="text" id="network-url" placeholder="rtsp://user:pass@ip:port/path">
+                <button id="connect-network-btn" class="btn" style="margin-top: 10px;">CONNECT</button>
             </div>
 
             <div class="control-group" style="margin-top: auto;">

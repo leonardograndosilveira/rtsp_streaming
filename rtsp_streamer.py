@@ -6,8 +6,8 @@ import gi
 
 # Required for GStreamer
 try:
-    gi.require_version('Gst', '1.0')
-    gi.require_version('GstRtspServer', '1.0')
+    gi.require_version("Gst", "1.0")
+    gi.require_version("GstRtspServer", "1.0")
 except ValueError as e:
     print(f"Error: Missing GStreamer dependencies. {e}")
     print("Please install: gir1.2-gst-rtsp-server-1.0")
@@ -15,60 +15,34 @@ except ValueError as e:
 from gi.repository import Gst, GstRtspServer, GLib
 
 
-class LoopingRTSPMediaFactory(GstRtspServer.RTSPMediaFactory):
-    """Custom media factory that creates looping media."""
-    
+class SimpleRTSPMediaFactory(GstRtspServer.RTSPMediaFactory):
+    """Simple RTSP media factory with passthrough H264 and looping."""
+
     def __init__(self, source_file):
         super().__init__()
         self.source_file = source_file
-        # Pipeline: Read file -> Parse H.264 -> RTP Payload (passthrough, no re-encoding)
+        # Robust looping pipeline: decode -> re-encode -> pay
+        # This ensures continuous timestamps and valid headers
         pipeline_str = (
-            f'( filesrc location="{self.source_file}" ! '
-            'qtdemux name=demux demux.video_0 ! queue ! h264parse ! '
-            'rtph264pay name=pay0 pt=96 )'
+            f'( multifilesrc location="{self.source_file}" loop=true ! '
+            "qtdemux ! h264parse ! avdec_h264 ! videoconvert ! "
+            "x264enc tune=zerolatency speed-preset=ultrafast key-int-max=30 ! "
+            "rtph264pay name=pay0 pt=96 config-interval=1 )"
         )
         print(f"Pipeline: {pipeline_str}")
         self.set_launch(pipeline_str)
         self.set_shared(True)
-    
-    def do_media_configure(self, media):
-        """Called when media is configured. Add EOS handler for looping."""
-        pipeline = media.get_element()
-        
-        # Find the pay0 element and add a pad probe to intercept EOS
-        pay0 = pipeline.get_by_name('pay0')
-        if pay0:
-            srcpad = pay0.get_static_pad('src')
-            if srcpad:
-                srcpad.add_probe(
-                    Gst.PadProbeType.EVENT_DOWNSTREAM,
-                    self._pad_probe_callback,
-                    pipeline
-                )
-    
-    def _pad_probe_callback(self, pad, info, pipeline):
-        """Pad probe callback to intercept EOS and seek back to start."""
-        event = info.get_event()
-        if event.type == Gst.EventType.EOS:
-            print("End of stream detected, looping...")
-            # Schedule seek in main context to avoid deadlock
-            GLib.idle_add(self._do_seek, pipeline)
-            # Drop the EOS event so it doesn't reach the client
-            return Gst.PadProbeReturn.DROP
-        return Gst.PadProbeReturn.OK
-    
-    def _do_seek(self, pipeline):
-        """Perform seek back to the beginning."""
-        pipeline.seek_simple(
-            Gst.Format.TIME,
-            Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT,
-            0
-        )
-        return False  # Don't repeat
 
 
 class RTSPServer:
-    def __init__(self, source_file, port=8777, mount_point="/stream", user="admin", password="admin"):
+    def __init__(
+        self,
+        source_file,
+        port=8777,
+        mount_point="/stream",
+        user="admin",
+        password="admin",
+    ):
         self.source_file = source_file
         self.port = port
         self.mount_point = mount_point
@@ -85,21 +59,21 @@ class RTSPServer:
         # Authentication
         auth = GstRtspServer.RTSPAuth()
         token = GstRtspServer.RTSPToken()
-        token.set_string('media.factory.role', user)
+        token.set_string("media.factory.role", user)
         basic = GstRtspServer.RTSPAuth.make_basic(user, password)
         auth.add_basic(basic, token)
         self.server.set_auth(auth)
 
         # Mount Point
         mounts = self.server.get_mount_points()
-        
-        # Create looping media factory
-        factory = LoopingRTSPMediaFactory(self.source_file)
-        
+
+        # Create simple media factory (uses multifilesrc for stable looping)
+        factory = SimpleRTSPMediaFactory(self.source_file)
+
         # Set permissions (only authenticated user can access)
         permissions = GstRtspServer.RTSPPermissions()
-        permissions.add_permission_for_role(user, 'media.factory.access', True)
-        permissions.add_permission_for_role(user, 'media.factory.construct', True)
+        permissions.add_permission_for_role(user, "media.factory.access", True)
+        permissions.add_permission_for_role(user, "media.factory.construct", True)
         factory.set_permissions(permissions)
 
         mounts.add_factory(self.mount_point, factory)
@@ -120,14 +94,17 @@ class RTSPServer:
 
 def main():
     parser = argparse.ArgumentParser(description="RTSP Streamer CLI")
-    parser.add_argument("--source", required=True, help="Path to the video file source", default="/home/allcance/projects/roi_text_extraction/sample_test.mp4")
+    parser.add_argument("--source", required=True, help="Path to the video file source")
+    parser.add_argument(
+        "--port", type=int, default=8777, help="RTSP port (default: 8777)"
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.source):
         print(f"Error: Source file not found: {args.source}")
         sys.exit(1)
 
-    server = RTSPServer(args.source)
+    server = RTSPServer(args.source, port=args.port)
     server.run()
 
 
