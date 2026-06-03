@@ -4,3 +4,12 @@ venv
 .venv
 web_app/uploads/arm_revolving.mp4
 web_app/uploads/dashboardvideo.mp4
+.gstack/
+
+# RTSP child process logs (one per stream port)
+web_app/rtsp_server*.log
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

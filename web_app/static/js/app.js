@@ -1,54 +1,36 @@
+// Card rendering + per-card preview/probe live in stream_card.js (loaded first).
 let currentMode = 'camera';
-let statusPollInterval = null;
+let streamsPollInterval = null;
+const STREAMS_POLL_MS = 3000;      // reconcile the active-stream grid
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Initial Load
     loadCameras();
     loadFiles();
-    checkStatus();
-    startStatusPolling();
     startClock();
+    refreshStreams();
+    startStreamsPolling();
 
-    // Event Listeners
-    document.getElementById('source-type').addEventListener('change', (e) => {
-        switchMode(e.target.value);
-    });
-
+    document.getElementById('source-type').addEventListener('change', (e) => switchMode(e.target.value));
     document.getElementById('refresh-cameras').addEventListener('click', loadCameras);
     document.getElementById('upload-btn').addEventListener('click', uploadFile);
-    document.getElementById('connect-network-btn').addEventListener('click', () => {
-        const btn = document.getElementById('connect-network-btn');
-        const url = document.getElementById('network-url').value;
-        if (url && url.startsWith('rtsp://')) {
-            const originalText = btn.innerText;
-            btn.innerText = "LINK ESTABLISHED";
-            btn.classList.add('btn-primary');
-            setTimeout(() => {
-                btn.innerText = originalText;
-                btn.classList.remove('btn-primary');
-            }, 2000);
-        } else {
-            alert("INVALID NETWORK TARGET");
-        }
-    });
-    document.getElementById('start-btn').addEventListener('click', startStream);
-    document.getElementById('stop-btn').addEventListener('click', stopStream);
-    document.getElementById('probe-btn').addEventListener('click', probeStream);
-    
-    // Auto-select based on initial dropdown state (usually 'camera')
+    document.getElementById('rtsp-port').addEventListener('input', updateEndpointPreview);
+    document.getElementById('rtsp-mount').addEventListener('input', updateEndpointPreview);
+    document.getElementById('add-btn').addEventListener('click', addStream);
+    document.getElementById('stop-all-btn').addEventListener('click', stopAllStreams);
+
     switchMode(document.getElementById('source-type').value);
+    updateEndpointPreview();
 });
 
 function startClock() {
     setInterval(() => {
         const now = new Date();
         document.getElementById('clock').innerText = now.toLocaleTimeString('en-US', {hour12: false});
-        // Simulate CPU/Mem fluctuation for effect
         if (Math.random() > 0.7) {
             document.getElementById('cpu-load').innerText = Math.floor(Math.random() * 30 + 10) + '%';
         }
         if (Math.random() > 0.8) {
-             document.getElementById('mem-load').innerText = (Math.random() * 0.5 + 3.8).toFixed(1) + 'GB';
+            document.getElementById('mem-load').innerText = (Math.random() * 0.5 + 3.8).toFixed(1) + 'GB';
         }
     }, 1000);
 }
@@ -72,23 +54,33 @@ function switchMode(mode) {
     }
 }
 
+// Custom RTSP output endpoint (port + mount path) chosen by the user.
+function getEndpoint() {
+    const port = parseInt(document.getElementById('rtsp-port').value, 10) || 8554;
+    let mount = document.getElementById('rtsp-mount').value.trim() || '/stream';
+    if (!mount.startsWith('/')) mount = '/' + mount;
+    return { port, mount };
+}
+
+function updateEndpointPreview() {
+    const { port, mount } = getEndpoint();
+    document.getElementById('rtsp-preview').innerText = `rtsp://localhost:${port}${mount}`;
+}
+
 async function loadCameras() {
     const select = document.getElementById('camera-select');
     select.innerHTML = '<option value="" disabled selected>SCANNING...</option>';
-    
     try {
         const res = await fetch('/api/cameras');
         const cameras = await res.json();
-        select.innerHTML = ''; // Clear scanning text
-        
+        select.innerHTML = '';
         if (cameras.length === 0) {
-             const option = document.createElement('option');
-             option.text = "NO DEVICES FOUND";
-             option.disabled = true;
-             select.add(option);
-             return;
+            const option = document.createElement('option');
+            option.text = "NO DEVICES FOUND";
+            option.disabled = true;
+            select.add(option);
+            return;
         }
-
         cameras.forEach(cam => {
             const option = document.createElement('option');
             option.value = cam.id;
@@ -103,22 +95,17 @@ async function loadCameras() {
 
 async function loadFiles() {
     const select = document.getElementById('file-select');
-    // Don't clear immediately to avoid flicker if just refreshing logic, but here we can
-    // select.innerHTML = '<option value="" disabled selected>LOADING...</option>';
-
     try {
         const res = await fetch('/api/files');
         const files = await res.json();
         select.innerHTML = '';
-        
         if (files.length === 0) {
-             const option = document.createElement('option');
-             option.text = "ARCHIVE EMPTY";
-             option.disabled = true;
-             select.add(option);
-             return;
+            const option = document.createElement('option');
+            option.text = "ARCHIVE EMPTY";
+            option.disabled = true;
+            select.add(option);
+            return;
         }
-
         files.forEach(f => {
             const option = document.createElement('option');
             option.value = f.path;
@@ -126,29 +113,22 @@ async function loadFiles() {
             select.add(option);
         });
     } catch (e) {
-         console.error("Failed to load files", e);
+        console.error("Failed to load files", e);
     }
 }
 
 async function uploadFile() {
     const input = document.getElementById('file-input');
     const btn = document.getElementById('upload-btn');
-    
     if (!input.files[0]) return alert("SELECT DATA SOURCE FIRST");
 
     const formData = new FormData();
     formData.append('file', input.files[0]);
-
     btn.innerText = "UPLOADING...";
     btn.classList.add('btn-disabled');
-
     try {
-        const res = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-        });
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
         if (res.ok) {
-            // alert("DATA UPLOAD COMPLETE");
             input.value = '';
             loadFiles();
         } else {
@@ -162,175 +142,127 @@ async function uploadFile() {
     }
 }
 
-async function startStream() {
-    let type = currentMode;
-    let path = '';
-    
-    if (type === 'camera') {
-        path = document.getElementById('camera-select').value;
-        if (!path || path.includes("NO DEVICES")) return alert("INVALID CAMERA FEED");
-    } else if (type === 'file') {
-        path = document.getElementById('file-select').value;
-         if (!path || path.includes("ARCHIVE EMPTY")) return alert("INVALID FILE SOURCE");
-    } else if (type === 'network') {
-        path = document.getElementById('network-url').value;
-        if (!path || !path.startsWith('rtsp://')) return alert("INVALID NETWORK TARGET");
+// Resolve the source path for the active sidebar mode, or null if invalid.
+function resolveSourcePath() {
+    if (currentMode === 'camera') {
+        const v = document.getElementById('camera-select').value;
+        return (!v || v.includes("NO DEVICES")) ? null : v;
     }
+    if (currentMode === 'file') {
+        const v = document.getElementById('file-select').value;
+        return (!v || v.includes("ARCHIVE EMPTY")) ? null : v;
+    }
+    const v = document.getElementById('network-url').value;
+    return (!v || !v.startsWith('rtsp://')) ? null : v;
+}
 
-    const btnStart = document.getElementById('start-btn');
-    btnStart.classList.add('btn-disabled');
-    btnStart.innerText = "INITIALIZING...";
+async function addStream() {
+    const path = resolveSourcePath();
+    if (!path) return alert("INVALID SOURCE FOR " + currentMode.toUpperCase());
 
+    const { port, mount } = getEndpoint();
+    const btn = document.getElementById('add-btn');
+    btn.classList.add('btn-disabled');
+    btn.innerText = "ADDING...";
     try {
-        const res = await fetch('/api/stream/start', {
+        const res = await fetch('/api/streams/start', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ type, path })
+            body: JSON.stringify({ type: currentMode, path, port, mount })
         });
-        
         if (res.ok) {
-            checkStatus();
+            // Suggest the next free port so adding several streams is quick.
+            document.getElementById('rtsp-port').value = String(port + 1);
+            updateEndpointPreview();
+            refreshStreams();
         } else {
-            alert("STREAM INITIALIZATION FAILED");
-            btnStart.classList.remove('btn-disabled');
-            btnStart.innerText = "INITIATE STREAM";
+            const err = await res.json().catch(() => ({}));
+            const msg = res.status === 409 ? "PORT BUSY: " : "STREAM INIT FAILED: ";
+            alert(msg + (err.detail || "unknown error"));
         }
     } catch (e) {
         console.error(e);
-        btnStart.classList.remove('btn-disabled');
-        btnStart.innerText = "INITIATE STREAM";
-    }
-}
-
-async function stopStream() {
-    const btnStop = document.getElementById('stop-btn');
-    btnStop.innerText = "TERMINATING...";
-    
-    try {
-        await fetch('/api/stream/stop', { method: 'POST' });
-        checkStatus();
-    } catch (e) {
-        console.error(e);
+        alert("STREAM INIT ERROR: could not reach server");
     } finally {
-        btnStop.innerText = "TERMINATE";
+        btn.classList.remove('btn-disabled');
+        btn.innerText = "ADD STREAM";
     }
 }
 
-async function probeStream() {
-    const btnProbe = document.getElementById('probe-btn');
-    const hudOverlay = document.getElementById('hud-overlay');
-    
-    btnProbe.innerText = "PROBING...";
-    btnProbe.classList.add('btn-disabled');
-
+async function stopStream(port) {
     try {
-        const res = await fetch('/api/stream/probe');
-        const data = await res.json();
-        
-        if (data.success) {
-            document.getElementById('hud-res').innerText = data.resolution;
-            document.getElementById('hud-codec').innerText = data.codec.toUpperCase();
-            document.getElementById('hud-bitrate').innerText = (data.bitrate / 1000).toFixed(0) + " KBPS";
-            
-            if (data.simulated) {
-                document.getElementById('hud-sim-tag').classList.remove('hidden');
-            } else {
-                document.getElementById('hud-sim-tag').classList.add('hidden');
-            }
-            
-            hudOverlay.classList.remove('hidden');
-            btnProbe.innerText = "HEALTH OK";
-            
-            setTimeout(() => {
-                btnProbe.innerText = "HEALTH CHECK";
-                btnProbe.classList.remove('btn-disabled');
-            }, 3000);
-        } else {
-            alert("PROBE FAILED: UNABLE TO ANALYZE STREAM");
-            btnProbe.innerText = "HEALTH CHECK";
-            btnProbe.classList.remove('btn-disabled');
-        }
+        await fetch(`/api/streams/${port}/stop`, { method: 'POST' });
     } catch (e) {
         console.error(e);
-        btnProbe.innerText = "HEALTH CHECK";
-        btnProbe.classList.remove('btn-disabled');
     }
+    removeCard(port);
+    refreshStreams();
 }
 
-async function checkStatus() {
+async function stopAllStreams() {
+    if (cardPollers.size === 0) return;
+    if (!confirm("Terminate ALL active streams?")) return;
     try {
-        const res = await fetch('/api/stream/status');
-        const data = await res.json();
-        updateUI(data);
+        await fetch('/api/streams/stop_all', { method: 'POST' });
     } catch (e) {
         console.error(e);
-        // Set offline status on error
-        updateUI({ active: false, url: "CONNECTION LOST" });
+    }
+    refreshStreams();
+}
+
+// --- Grid reconcile -------------------------------------------------------
+
+async function refreshStreams() {
+    try {
+        const res = await fetch('/api/streams');
+        const streams = await res.json();
+        reconcileGrid(streams);
+        updateFooter(streams.length);
+    } catch (e) {
+        console.error(e);
+        updateFooter(0, true);
     }
 }
 
-function updateUI(status) {
-    const btnStart = document.getElementById('start-btn');
-    const btnStop = document.getElementById('stop-btn');
-    const btnProbe = document.getElementById('probe-btn');
-    
-    const viewportPlaceholder = document.getElementById('video-placeholder');
-    const streamContainer = document.getElementById('stream-container');
-    const hudOverlay = document.getElementById('hud-overlay');
-    
-    const statusDot = document.getElementById('status-dot');
-    const statusText = document.getElementById('status-text');
-    const rtspDisplay = document.getElementById('rtsp-url-display');
+function reconcileGrid(streams) {
+    const grid = document.getElementById('stream-grid');
+    const activePorts = new Set(streams.map(s => s.port));
 
-    if (status.active) {
-        // Stream Running
-        btnStart.classList.add('btn-disabled');
-        btnStart.innerText = "STREAM ACTIVE";
-        
-        btnStop.classList.remove('btn-disabled');
-        btnProbe.classList.remove('hidden');
-        
-        viewportPlaceholder.classList.add('hidden');
-        streamContainer.classList.remove('hidden');
-        
-        statusDot.className = 'status-indicator active';
-        statusText.innerText = "SYSTEM ACTIVE";
-        statusText.style.color = "var(--neon-green)";
-        
-        rtspDisplay.innerText = status.url || "RTSP://UNKNOWN";
-        rtspDisplay.style.color = "var(--neon-green)";
+    // Drop cards whose stream is gone (stopped or died).
+    grid.querySelectorAll('.stream-card').forEach(card => {
+        const port = parseInt(card.dataset.port, 10);
+        if (!activePorts.has(port)) removeCard(port);
+    });
 
-        if (hudOverlay.classList.contains('hidden')) {
-            probeStream();
-        }
+    // Add cards for newly-seen streams.
+    streams.forEach(s => {
+        if (!grid.querySelector(`.stream-card[data-port="${s.port}"]`)) addCard(s);
+    });
+}
+
+function updateFooter(count, lost = false) {
+    document.getElementById('empty-placeholder').classList.toggle('hidden', count > 0);
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    const countDisplay = document.getElementById('stream-count-display');
+    countDisplay.innerText = `${count} STREAMS ACTIVE`;
+
+    if (lost) {
+        dot.className = 'status-indicator offline';
+        text.innerText = "CONNECTION LOST";
+        text.style.color = "var(--neon-red)";
+    } else if (count > 0) {
+        dot.className = 'status-indicator active';
+        text.innerText = "SYSTEM ACTIVE";
+        text.style.color = "var(--neon-green)";
     } else {
-        // Stream Stopped
-        btnStart.classList.remove('btn-disabled');
-        btnStart.innerText = "INITIATE STREAM";
-        
-        btnStop.classList.add('btn-disabled');
-        btnProbe.classList.add('hidden');
-        hudOverlay.classList.add('hidden');
-        
-        viewportPlaceholder.classList.remove('hidden');
-        streamContainer.classList.add('hidden');
-        
-        // If it was connection lost, keep it red
-        if (status.url === "CONNECTION LOST") {
-            statusDot.className = 'status-indicator offline';
-            statusText.innerText = "CONNECTION LOST";
-            statusText.style.color = "var(--neon-red)";
-        } else {
-            statusDot.className = 'status-indicator standby';
-            statusText.innerText = "SYSTEM STANDBY";
-            statusText.style.color = "var(--text-dim)";
-            rtspDisplay.innerText = "RTSP://DISCONNECTED";
-            rtspDisplay.style.color = "var(--text-dim)";
-        }
+        dot.className = 'status-indicator standby';
+        text.innerText = "SYSTEM STANDBY";
+        text.style.color = "var(--text-dim)";
     }
 }
 
-function startStatusPolling() {
-    if (statusPollInterval) clearInterval(statusPollInterval);
-    statusPollInterval = setInterval(checkStatus, 3000);
+function startStreamsPolling() {
+    if (streamsPollInterval) clearInterval(streamsPollInterval);
+    streamsPollInterval = setInterval(refreshStreams, STREAMS_POLL_MS);
 }

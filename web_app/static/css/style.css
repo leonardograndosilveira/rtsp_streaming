@@ -166,7 +166,7 @@ aside::after {
 }
 
 /* Inputs & Selects */
-select, input[type="text"], input[type="file"] {
+select, input[type="text"], input[type="number"], input[type="file"] {
     background: #000;
     border: 1px solid var(--panel-border);
     color: var(--neon-blue);
@@ -324,6 +324,152 @@ footer {
     font-family: var(--font-mono);
     color: var(--neon-blue);
 }
+
+/* Live preview viewport */
+#stream-container {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.preview-frame {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* Liveness banner: honest WORKING / NO SIGNAL state */
+.liveness-banner {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid var(--panel-border);
+    padding: 8px 14px;
+    font-family: var(--font-hud);
+    font-size: 14px;
+    letter-spacing: 1px;
+    z-index: 10;
+}
+
+.liveness-live { border-color: var(--neon-green); color: var(--neon-green); }
+.liveness-dead { border-color: var(--neon-red); color: var(--neon-red); }
+.liveness-pending { border-color: var(--neon-amber); color: var(--neon-amber); }
+
+/* Stream stats HUD */
+.hud-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--panel-border);
+    padding: 10px;
+    font-family: var(--font-hud);
+    font-size: 12px;
+    color: var(--neon-amber);
+    text-align: left;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.hud-title {
+    border-bottom: 1px solid var(--panel-border);
+    margin-bottom: 5px;
+    padding-bottom: 2px;
+    font-weight: bold;
+}
+
+/* Multi-stream grid of live cards */
+.stream-grid {
+    position: absolute;
+    inset: 0;
+    padding: 16px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    align-content: start;
+}
+.stream-grid:empty { display: none; }
+
+.stream-card {
+    border: 1px solid var(--panel-border);
+    background: var(--panel-bg);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+}
+
+.card-preview {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+}
+.card-frame {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.card-liveness {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--panel-border);
+}
+
+.card-stats {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--panel-border);
+    padding: 4px 8px;
+    font-size: 10px;
+    color: var(--neon-blue);
+    line-height: 1.5;
+    text-align: left;
+}
+
+.card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px 0;
+}
+.card-title { color: var(--neon-green); font-weight: bold; letter-spacing: 1px; }
+.card-port { color: var(--neon-amber); font-size: 12px; }
+
+.card-url {
+    padding: 4px 10px 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    word-break: break-all;
+}
+
+.card-actions {
+    display: flex;
+    gap: 8px;
+    padding: 0 10px 10px;
+}
+.card-actions .btn { margin: 0; flex: 1; }
 
 /* Utility classes for display toggle */
 .hidden {

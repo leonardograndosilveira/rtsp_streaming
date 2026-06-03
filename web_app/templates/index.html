@@ -54,24 +54,29 @@
             </div>
 
             <div id="network-controls" class="control-group hidden">
-                <div class="control-label">Network Connection</div>
+                <div class="control-label">Source URL (Pull)</div>
                 <input type="text" id="network-url" placeholder="rtsp://user:pass@ip:port/path">
-                <button id="connect-network-btn" class="btn" style="margin-top: 10px;">CONNECT</button>
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">RTSP Output</div>
+                <input type="number" id="rtsp-port" value="8554" min="1" max="65535" placeholder="Port (8554)">
+                <input type="text" id="rtsp-mount" value="/stream" placeholder="Mount (/stream)" style="margin-top: 8px;">
+                <div class="control-label" style="margin-top: 8px; font-size: 0.7em; color: var(--neon-green);">PUBLISH: <span id="rtsp-preview">rtsp://localhost:8554/stream</span></div>
             </div>
 
             <div class="control-group" style="margin-top: auto;">
                 <div class="control-label">Stream Control</div>
-                <button id="start-btn" class="btn btn-primary">INITIATE STREAM</button>
-                <button id="stop-btn" class="btn btn-danger btn-disabled">TERMINATE</button>
-                <button id="probe-btn" class="btn btn-secondary hidden" style="margin-top: 10px;">HEALTH CHECK</button>
+                <button id="add-btn" class="btn btn-primary">ADD STREAM</button>
+                <button id="stop-all-btn" class="btn btn-danger" style="margin-top: 10px;">TERMINATE ALL</button>
             </div>
         </aside>
 
-        <!-- MAIN VIEWPORT -->
+        <!-- MAIN VIEWPORT: grid of concurrent stream cards -->
         <main id="viewport">
             <div class="scan-line-anim"></div>
-            <!-- The video player or image would go here. For now, placeholders/status. -->
-            <div id="video-placeholder" class="video-feed-placeholder">
+
+            <div id="empty-placeholder" class="video-feed-placeholder">
                 <div style="font-size: 64px; color: var(--panel-border); margin-bottom: 20px;">
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9Z"/>
@@ -82,23 +87,11 @@
                         <path d="M20 12h2"/>
                     </svg>
                 </div>
-                <h2 style="color: var(--text-dim); letter-spacing: 2px;">WAITING FOR SIGNAL</h2>
-                <div style="font-size: 12px; color: var(--panel-border);">[RTSP DISCONNECTED]</div>
+                <h2 style="color: var(--text-dim); letter-spacing: 2px;">NO ACTIVE STREAMS</h2>
+                <div style="font-size: 12px; color: var(--panel-border);">[ADD A SOURCE TO BEGIN]</div>
             </div>
-            
-            <!-- Hidden by default, shown when streaming -->
-            <div id="stream-container" class="hidden" style="width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; position: relative;">
-                 <h2 id="stream-status-msg" style="color: var(--neon-green); animation: blink 1s infinite;">STREAM ACTIVE</h2>
-                 
-                 <div id="hud-overlay" class="hidden" style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); border: 1px solid var(--panel-border); padding: 10px; font-family: monospace; font-size: 12px; color: var(--neon-amber); text-align: left; pointer-events: none; z-index: 10;">
-                    <div style="border-bottom: 1px solid var(--panel-border); margin-bottom: 5px; padding-bottom: 2px; font-weight: bold;">STREAM_STATS</div>
-                    <div>RES: <span id="hud-res">N/A</span></div>
-                    <div>CDC: <span id="hud-codec">N/A</span></div>
-                    <div>BTR: <span id="hud-bitrate">N/A</span></div>
-                    <div id="hud-sim-tag" class="hidden" style="font-size: 10px; color: var(--text-dim); margin-top: 5px;">[SIMULATED_DATA]</div>
-                 </div>
-                 
-            </div>
+
+            <div id="stream-grid" class="stream-grid"></div>
         </main>
 
         <!-- FOOTER / STATUS -->
@@ -107,10 +100,38 @@
                 <span id="status-dot" class="status-indicator standby"></span>
                 <span id="status-text" class="console-log">SYSTEM STANDBY</span>
             </div>
-            <div class="console-log" id="rtsp-url-display">RTSP://N/A</div>
+            <div class="console-log" id="stream-count-display">0 STREAMS ACTIVE</div>
         </footer>
     </div>
 
+    <!-- Cloned per active stream by app.js -->
+    <template id="stream-card-template">
+        <div class="stream-card">
+            <div class="card-preview">
+                <img class="card-frame" alt="Live RTSP preview frame">
+                <div class="card-liveness liveness-pending">
+                    <span class="status-indicator standby"></span>
+                    <span class="card-liveness-text">VERIFYING...</span>
+                </div>
+                <div class="card-stats hidden">
+                    <div>RES <span class="stat-res">N/A</span></div>
+                    <div>CDC <span class="stat-codec">N/A</span></div>
+                    <div>BTR <span class="stat-bitrate">N/A</span></div>
+                </div>
+            </div>
+            <div class="card-meta">
+                <span class="card-title">/stream</span>
+                <span class="card-port">:0000</span>
+            </div>
+            <div class="card-url console-log">rtsp://...</div>
+            <div class="card-actions">
+                <button class="btn card-test">TEST</button>
+                <button class="btn btn-danger card-stop">STOP</button>
+            </div>
+        </div>
+    </template>
+
+    <script src="/static/js/stream_card.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>
