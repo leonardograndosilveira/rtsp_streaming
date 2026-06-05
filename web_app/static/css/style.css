@@ -465,11 +465,26 @@ footer {
 }
 
 .card-tailscale-url {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 0 10px 8px;
     font-size: 11px;
     color: var(--neon-blue);
-    word-break: break-all;
 }
+.card-tailscale-text { word-break: break-all; flex: 1; }
+.btn-copy {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--neon-blue);
+    color: var(--neon-blue);
+    font-size: 10px;
+    font-family: inherit;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    cursor: pointer;
+}
+.btn-copy:hover { background: var(--neon-blue); color: #000; }
 
 .card-actions {
     display: flex;

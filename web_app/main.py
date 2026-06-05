@@ -27,6 +27,21 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 stream_registry = StreamRegistry()
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
+@app.on_event("startup")
+def log_network_reachability():
+    # The bare `uvicorn web_app.main:app` launch gives no hint about VPN
+    # reachability. Surface it at startup so the operator sees whether remote
+    # (Tailscale) viewers can reach published streams without opening the UI.
+    local_ip = get_local_ip()
+    ts_ip = get_tailscale_ip()
+    print(f"[network] LAN address: {local_ip}")
+    if ts_ip:
+        print(f"[network] Tailscale VPN reachable at: {ts_ip}")
+    else:
+        print("[network] Tailscale VPN OFFLINE — only LAN URLs will be published. "
+              "Run `tailscale up` to enable remote access.")
+
 # NOTE: handlers that shell out (start/stop/probe/snapshot) are plain `def`,
 # NOT `async def`. They call blocking subprocess.run(); a blocking call inside
 # an async handler freezes uvicorn's whole event loop (an 8s ffmpeg snapshot

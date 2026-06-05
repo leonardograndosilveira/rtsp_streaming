@@ -13,13 +13,41 @@ function addCard(stream) {
     card.querySelector('.card-url').innerText = stream.url;
     const tsUrlEl = card.querySelector('.card-tailscale-url');
     if (stream.tailscale_url) {
-        tsUrlEl.innerText = '↗ VPN: ' + stream.tailscale_url;
+        card.querySelector('.card-tailscale-text').innerText = '↗ VPN: ' + stream.tailscale_url;
+        const copyBtn = card.querySelector('.card-copy');
+        copyBtn.addEventListener('click', () => copyVpnUrl(stream.tailscale_url, copyBtn));
         tsUrlEl.classList.remove('hidden');
     }
     card.querySelector('.card-test').addEventListener('click', () => probeCard(stream.port, card));
     card.querySelector('.card-stop').addEventListener('click', () => stopStream(stream.port));
     document.getElementById('stream-grid').appendChild(card);
     startCardPreview(stream.port, card);
+}
+
+// Copy the raw VPN URL (no '↗ VPN:' prefix) to clipboard. clipboard API needs a
+// secure context (https or localhost); fall back to a hidden textarea + execCommand
+// so copy still works when the dashboard is served over plain-HTTP LAN.
+async function copyVpnUrl(url, btn) {
+    const original = btn.innerText;
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(url);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+        }
+        btn.innerText = 'COPIED';
+    } catch (e) {
+        console.error('copy failed', e);
+        btn.innerText = 'FAILED';
+    }
+    setTimeout(() => { btn.innerText = original; }, 1500);
 }
 
 function removeCard(port) {
