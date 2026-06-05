@@ -458,9 +458,16 @@ footer {
 .card-port { color: var(--neon-amber); font-size: 12px; }
 
 .card-url {
-    padding: 4px 10px 8px;
+    padding: 4px 10px 2px;
     font-size: 11px;
     color: var(--text-dim);
+    word-break: break-all;
+}
+
+.card-tailscale-url {
+    padding: 0 10px 8px;
+    font-size: 11px;
+    color: var(--neon-blue);
     word-break: break-all;
 }
 

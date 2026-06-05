@@ -10,6 +10,8 @@ import subprocess
 from .camera_manager import CameraManager
 from .stream_registry import StreamRegistry, PortBusyError
 from .upload_guard import sanitize_upload_filename
+from .network_info import get_tailscale_ip, get_local_ip
+from .rtsp_endpoint import build_rtsp_url
 
 app = FastAPI()
 
@@ -75,7 +77,7 @@ def start_stream(data: dict):
         raise HTTPException(status_code=400, detail="Missing type or path")
 
     try:
-        return stream_registry.start(source_type, source_path, port, mount)
+        status = stream_registry.start(source_type, source_path, port, mount)
     except PortBusyError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
@@ -83,10 +85,31 @@ def start_stream(data: dict):
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    ts_ip = get_tailscale_ip()
+    if ts_ip and status.get("active"):
+        status["tailscale_url"] = build_rtsp_url(status["port"], status["mount"], ts_ip)
+    return status
+
+
+@app.get("/api/network/info")
+def network_info():
+    ts_ip = get_tailscale_ip()
+    return {
+        "local_ip": get_local_ip(),
+        "tailscale_ip": ts_ip,
+        "tailscale_connected": ts_ip is not None,
+    }
+
 
 @app.get("/api/streams")
-async def list_streams():
-    return stream_registry.list()
+def list_streams():
+    streams = stream_registry.list()
+    ts_ip = get_tailscale_ip()
+    if ts_ip:
+        for s in streams:
+            if s.get("active"):
+                s["tailscale_url"] = build_rtsp_url(s["port"], s["mount"], ts_ip)
+    return streams
 
 
 @app.post("/api/streams/stop_all")

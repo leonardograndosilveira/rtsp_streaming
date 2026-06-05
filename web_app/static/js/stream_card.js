@@ -11,6 +11,11 @@ function addCard(stream) {
     card.querySelector('.card-title').innerText = stream.mount;
     card.querySelector('.card-port').innerText = ':' + stream.port;
     card.querySelector('.card-url').innerText = stream.url;
+    const tsUrlEl = card.querySelector('.card-tailscale-url');
+    if (stream.tailscale_url) {
+        tsUrlEl.innerText = '↗ VPN: ' + stream.tailscale_url;
+        tsUrlEl.classList.remove('hidden');
+    }
     card.querySelector('.card-test').addEventListener('click', () => probeCard(stream.port, card));
     card.querySelector('.card-stop').addEventListener('click', () => stopStream(stream.port));
     document.getElementById('stream-grid').appendChild(card);

@@ -18,6 +18,7 @@
                 <span>CPU: <span id="cpu-load">12%</span></span>
                 <span>MEM: <span id="mem-load">4.2GB</span></span>
                 <span>NET: <span style="color: var(--neon-amber);">STABLE</span></span>
+                <span>VPN: <span id="tailscale-status" style="color: var(--text-dim);">CHECKING...</span></span>
                 <span id="clock">00:00:00</span>
             </div>
         </header>
@@ -62,7 +63,8 @@
                 <div class="control-label">RTSP Output</div>
                 <input type="number" id="rtsp-port" value="8554" min="1" max="65535" placeholder="Port (8554)">
                 <input type="text" id="rtsp-mount" value="/stream" placeholder="Mount (/stream)" style="margin-top: 8px;">
-                <div class="control-label" style="margin-top: 8px; font-size: 0.7em; color: var(--neon-green);">PUBLISH: <span id="rtsp-preview">rtsp://localhost:8554/stream</span></div>
+                <div class="control-label" style="margin-top: 8px; font-size: 0.7em; color: var(--neon-green);">LOCAL: <span id="rtsp-preview">rtsp://localhost:8554/stream</span></div>
+                <div class="control-label hidden" id="tailscale-preview-container" style="margin-top: 4px; font-size: 0.7em; color: var(--neon-blue);">VPN: <span id="tailscale-preview"></span></div>
             </div>
 
             <div class="control-group" style="margin-top: auto;">
@@ -124,6 +126,7 @@
                 <span class="card-port">:0000</span>
             </div>
             <div class="card-url console-log">rtsp://...</div>
+            <div class="card-tailscale-url console-log hidden"></div>
             <div class="card-actions">
                 <button class="btn card-test">TEST</button>
                 <button class="btn btn-danger card-stop">STOP</button>

@@ -1,11 +1,13 @@
 // Card rendering + per-card preview/probe live in stream_card.js (loaded first).
 let currentMode = 'camera';
 let streamsPollInterval = null;
+let tailscaleIp = null;
 const STREAMS_POLL_MS = 3000;      // reconcile the active-stream grid
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCameras();
     loadFiles();
+    loadNetworkInfo();
     startClock();
     refreshStreams();
     startStreamsPolling();
@@ -65,6 +67,35 @@ function getEndpoint() {
 function updateEndpointPreview() {
     const { port, mount } = getEndpoint();
     document.getElementById('rtsp-preview').innerText = `rtsp://localhost:${port}${mount}`;
+    const tsCont = document.getElementById('tailscale-preview-container');
+    if (tailscaleIp) {
+        document.getElementById('tailscale-preview').innerText = `rtsp://${tailscaleIp}:${port}${mount}`;
+        tsCont.classList.remove('hidden');
+    } else {
+        tsCont.classList.add('hidden');
+    }
+}
+
+async function loadNetworkInfo() {
+    const badge = document.getElementById('tailscale-status');
+    try {
+        const res = await fetch('/api/network/info');
+        const info = await res.json();
+        if (info.tailscale_connected) {
+            tailscaleIp = info.tailscale_ip;
+            badge.innerText = info.tailscale_ip;
+            badge.style.color = 'var(--neon-green)';
+        } else {
+            tailscaleIp = null;
+            badge.innerText = 'OFFLINE';
+            badge.style.color = 'var(--neon-red)';
+        }
+        updateEndpointPreview();
+    } catch (e) {
+        console.error("Failed to load network info", e);
+        badge.innerText = 'ERR';
+        badge.style.color = 'var(--neon-red)';
+    }
 }
 
 async function loadCameras() {
