@@ -1,8 +1,7 @@
 // Per-card live preview + probe. One card per active RTSP stream.
 // Globals shared with app.js (both loaded as plain scripts): cardPollers is
 // read by stopAllStreams; addCard/removeCard are called by reconcileGrid.
-const cardPollers = new Map();     // port -> setInterval id for that card's preview
-const PREVIEW_INTERVAL_MS = 1000;  // per-card snapshot poll (~1 fps)
+const cardPollers = new Map();     // port -> null; tracks which cards are active
 
 function addCard(stream) {
     const tpl = document.getElementById('stream-card-template');
@@ -56,23 +55,18 @@ function removeCard(port) {
     if (card) card.remove();
 }
 
-// Each card polls its own live JPEG frame; a frame that loads == source works.
-// Chained (not setInterval): the next request fires only AFTER the current
-// frame settles. A slow/dead source's snapshot can take up to the server's 8s
-// ffmpeg timeout, so a fixed 1s interval would pile requests up and exhaust the
-// browser's per-host connection pool -- which then blocks adding new streams.
-// Chaining caps in-flight snapshots at one per card.
+// Grab ONE preview frame per card, then keep it static. Each snapshot spawns a
+// fresh `ffmpeg -rtsp_transport tcp` RTSP client: connect, wait for a keyframe,
+// decode, tear down. Polling that once per second per card produced a SETUP/
+// TEARDOWN storm against the GStreamer rtsp-server's shared pipeline that
+// stuttered real viewers (VLC). A single grab gives the card a thumbnail without
+// competing with the live stream. Liveness reflects that one grab.
 function startCardPreview(port, card) {
     const img = card.querySelector('.card-frame');
-    const tick = () => { img.src = `/api/streams/${port}/snapshot?t=${Date.now()}`; };
-    const again = () => {
-        if (!cardPollers.has(port)) return;  // card was stopped mid-request
-        cardPollers.set(port, setTimeout(tick, PREVIEW_INTERVAL_MS));
-    };
-    img.onload = () => { setCardLiveness(card, 'live', 'LIVE'); again(); };
-    img.onerror = () => { setCardLiveness(card, 'dead', 'NO SIGNAL'); again(); };
-    cardPollers.set(port, null);  // mark active (no timer pending yet)
-    tick();
+    img.onload = () => setCardLiveness(card, 'live', 'LIVE');
+    img.onerror = () => setCardLiveness(card, 'dead', 'NO SIGNAL');
+    cardPollers.set(port, null);  // mark active so stopCardPreview/stopAll still track it
+    img.src = `/api/streams/${port}/snapshot?t=${Date.now()}`;
 }
 
 function stopCardPreview(port) {
